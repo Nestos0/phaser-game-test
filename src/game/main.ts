@@ -1,4 +1,5 @@
 import { Boot } from './scenes/Boot';
+import { GameScene } from './scenes/GameScene'
 import { AUTO, Game } from 'phaser';
 
 // const width = window.innerWidth
@@ -29,7 +30,8 @@ const config: Phaser.Types.Core.GameConfig = {
     parent: 'game-container',
     backgroundColor: '#028af8',
     scene: [
-        Boot
+        Boot,
+        GameScene
     ]
 };
 
