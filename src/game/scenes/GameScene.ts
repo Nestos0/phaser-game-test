@@ -7,33 +7,30 @@ function mapVelocityToAngle(
     minAngle: number,
     maxAngle: number,
 ): number {
-    // 先把 v 限制到区间
     const clampedV = Phaser.Math.Clamp(v, minV, maxV);
-
-    // 归一化速度到 0 ~ 1
     const normV = (clampedV - minV) / (maxV - minV);
-
-    // 用二次函数调整映射，举例用 y = x^2 曲线（凸起）
     const adjusted = normV * normV;
-
-    // 映射回角度范围
     return minAngle + adjusted * (maxAngle - minAngle);
 }
 
 export class GameScene extends Phaser.Scene {
-    private GAME_WIDTH: number;
-    private GAME_HEIGHT: number;
-    camera: Phaser.Cameras.Scene2D.Camera;
-    background: Phaser.GameObjects.Image;
-    gameText: Phaser.GameObjects.Text;
-    brick: Phaser.GameObjects.Sprite;
-    keyboard: Phaser.Input.Keyboard.KeyboardPlugin;
-    bird: Phaser.Physics.Arcade.Sprite;
-    pipes: Phaser.Physics.Arcade.Group;
+    private GAME_WIDTH!: number;
+    private GAME_HEIGHT!: number;
+    camera!: Phaser.Cameras.Scene2D.Camera;
+    background!: Phaser.GameObjects.Image;
+    gameText!: Phaser.GameObjects.Text;
+    brick!: Phaser.GameObjects.Sprite;
+    keyboard!: Phaser.Input.Keyboard.KeyboardPlugin;
+    bird!: Phaser.Physics.Arcade.Sprite;
+    pipes!: Phaser.Physics.Arcade.Group;
+    gameover: boolean = false;
+    overlapRef!: Phaser.Physics.Arcade.Collider;
+    ground!: Phaser.GameObjects.TileSprite;
 
-    PIPES_TO_RENDER: number = 5;
+    readonly PIPES_TO_RENDER = 5;
+    HORIZONTAL_HEIGHT!: number;
 
-    initbirdPosition: number = 200;
+    readonly initbirdPosition = 200;
 
     constructor() {
         super("GameScene");
@@ -42,29 +39,38 @@ export class GameScene extends Phaser.Scene {
     preload() {
         this.GAME_WIDTH = Number(this.sys.game.config.width || 800);
         this.GAME_HEIGHT = Number(this.sys.game.config.height || 600);
+
+        this.HORIZONTAL_HEIGHT = (this.GAME_HEIGHT / 8) * 7;
+
         this.pipes = this.physics.add.group();
-        // Boot 场景只加载 Preloader 所需资源
     }
 
     create() {
         this.add.image(0, 0, "background").setOrigin(0).setScale(2);
-        // ✅ Safely access game config width with type assertion
-        const posX = this.GAME_WIDTH / 2 - 400; // Fallback to 800 if undefined
+
+        this.ground = this.add
+            .tileSprite(
+                0,
+                this.HORIZONTAL_HEIGHT,
+                this.GAME_WIDTH,
+                85,
+                "ground",
+            )
+            .setOrigin(0)
+            .setScale(1, 2)
+            .setDepth(100);
+
+        const posX = this.GAME_WIDTH / 2 - 400;
         const posY = this.GAME_HEIGHT / 2 - 100;
 
-        // ✅ Assign bird sprite
         this.bird = this.physics.add
             .sprite(posX, posY, "bird")
             .setOrigin(0.5)
             .setScale(2);
-        this.bird.anims.play("fly");
         this.bird.setGravityY(980);
-
-        // this.physics.add.sprite(900, 300, "pipe").setOrigin(0.5, 1).setScale(2).setFlipY(true)
-        // this.physics.add.sprite(900, 500, "pipe").setOrigin(0.5, 0).setScale(2)
+        this.bird.anims.play("fly");
 
         this.camera = this.cameras.main;
-        // this.camera.setBackgroundColor(0x00ff00);
 
         this.generatePipe();
 
@@ -74,56 +80,77 @@ export class GameScene extends Phaser.Scene {
         });
 
         this.input.keyboard?.on("keydown-SPACE", () => {
-            this.bird.setVelocityY(-400);
-            // this.bird.setAccelerationY(500)
+            if (!this.gameover) {
+                this.bird.setVelocityY(-400);
+            } else {
+                this.restartgame(this.bird);
+            }
         });
 
-        this.physics.add.collider(this.bird, this.pipes, () => {
-            // 碰撞回调：比如重启游戏
-            this.restartgame(this.bird);
-        });
+        this.overlapRef = this.physics.add.overlap(this.bird, this.pipes, () =>
+            this.gameoverAni(),
+        );
 
-        this.pipes
-            .getChildren()
-            .forEach((child: Phaser.GameObjects.GameObject) => {
-                const pipe = child as Phaser.Physics.Arcade.Sprite;
-                pipe.body!.immovable = true;
-                return true;
-            });
+        this.pipes.getChildren().forEach((child) => {
+            const pipe = child as Phaser.Physics.Arcade.Sprite;
+            pipe.body!.immovable = true;
+        });
 
         EventBus.emit("current-scene-ready", this);
     }
 
     update() {
-        // ✅ Use game canvas width with type safety
-        const gameWidth = Number(this.sys.game.config.height || 800);
-        if (this.bird.y >= gameWidth - this.bird.height * 2) {
-            this.restartgame(this.bird);
-        } else if (this.bird.y - this.bird.height * 2 <= 0) {
-            this.restartgame(this.bird);
+        if (!this.gameover) {
+            this.ground.tilePositionX += 2;
+
+            if (this.bird.y >= this.HORIZONTAL_HEIGHT - this.bird.height) {
+                this.gameoverAni();
+            } else if (this.bird.y - this.bird.height * 2 <= 0) {
+                this.gameoverAni();
+            }
+        } else {
+            if (this.bird.y >= this.HORIZONTAL_HEIGHT - this.bird.height / 2) {
+                this.bird.setVelocityY(0);
+                this.bird.setGravityY(0);
+                this.bird.setY(this.HORIZONTAL_HEIGHT - this.bird.height / 2);
+            }
         }
+
         this.recycle();
-        // 获取鸟的下落速度
+
         const vy = this.bird.body!.velocity.y;
+        const angle = mapVelocityToAngle(vy, -300, 300, -30, 45);
+        this.bird.angle = Phaser.Math.Linear(this.bird.angle, angle, 0.1);
+    }
 
-        // 设定速度和角度范围
-        const minV = -300; // 最大向上速度
-        const maxV = 300; // 最大向下速度
-        const minAngle = -30; // 最大抬头角度
-        const maxAngle = 45; // 最大低头角度
-
-        const angle = mapVelocityToAngle(vy, minV, maxV, minAngle, maxAngle);
-        this.bird.angle = Phaser.Math.Linear(this.bird.angle, angle, 0.1); // 平滑过渡
+    gameoverAni() {
+        this.overlapRef.active = false;
+        this.pipes.setVelocityX(0);
+        this.bird.setVelocityY(-500);
+        this.time.delayedCall(200, () => {
+            this.gameover = true;
+            this.bird.anims.pause();
+            this.bird.setVelocityX(0);
+            // this.bird.setVelocityY(-600);
+            this.bird.setGravityY(2080);
+            this.bird.setDepth(1000);
+        });
     }
 
     restartgame(bird: Phaser.Physics.Arcade.Sprite) {
-        const posX = this.GAME_WIDTH / 2 - 400; // Fallback to 800 if undefined
+        this.overlapRef.active = true;
+        this.gameover = false;
+        this.bird.setGravityY(980);
+        this.bird.anims.play("fly");
+
+        const posX = this.GAME_WIDTH / 2 - 400;
         const posY = this.GAME_HEIGHT / 2 - 100;
+
         bird.setPosition(posX, posY);
         bird.setVelocity(0);
         bird.setAcceleration(0);
 
-        this.pipes.clear(true, true); // 清空并销毁子对象，但保留 group 实例
+        this.pipes.clear(true, true);
         this.generatePipe();
     }
 
@@ -132,19 +159,13 @@ export class GameScene extends Phaser.Scene {
         lPipe: Phaser.Physics.Arcade.Sprite,
     ) {
         const rightMostX = this.getRightMostX();
-        const gameHeight: number = Number(this.sys.game.config.height);
-        const pipeHorizontalDistanceRange: [number, number] = [500, 600];
-        const pipeVerticalDistanceRange: [number, number] = [150, 250];
-        let pipeVerticalDistance = Phaser.Math.Between(
-            ...pipeVerticalDistanceRange,
+        const pipeHorizontalDistance = Phaser.Math.Between(500, 600);
+        const pipeVerticalDistance = Phaser.Math.Between(150, 250);
+        const pipeUpperPos = Phaser.Math.Between(
+            this.GAME_HEIGHT / 5,
+            (this.GAME_HEIGHT / 5) * 3,
         );
-        let pipeHorizontalDistance = Phaser.Math.Between(
-            ...pipeHorizontalDistanceRange,
-        );
-        let pipeUpperPos = Phaser.Math.Between(
-            gameHeight / 5,
-            (gameHeight / 5) * 3,
-        );
+
         uPipe.setPosition(rightMostX + pipeHorizontalDistance, pipeUpperPos);
         lPipe.setPosition(
             rightMostX + pipeHorizontalDistance,
@@ -166,54 +187,43 @@ export class GameScene extends Phaser.Scene {
                 .setScale(2);
             this.placePipe(upperPipe, lowerPipe);
         }
+
         this.pipes.setVelocityX(-200);
     }
 
     getRightMostX(): number {
-        let rightMostX: number = 0;
-        this.pipes
-            .getChildren()
-            .forEach((child: Phaser.GameObjects.GameObject) => {
-                const pipe = child as Phaser.Physics.Arcade.Sprite;
-                rightMostX = Math.max(pipe.x, rightMostX);
-            });
-
+        let rightMostX = 0;
+        this.pipes.getChildren().forEach((child) => {
+            const pipe = child as Phaser.Physics.Arcade.Sprite;
+            rightMostX = Math.max(pipe.x, rightMostX);
+        });
         return rightMostX;
     }
 
-    recycle(): void {
+    recycle() {
         const tempPipes: Phaser.Physics.Arcade.Sprite[] = [];
         this.pipes.getChildren().forEach((pipe) => {
-            const sprite = pipe as Phaser.Physics.Arcade.Sprite; // Type assertion since we expect arcade sprites
+            const sprite = pipe as Phaser.Physics.Arcade.Sprite;
             if (sprite.getBounds().right <= 0) {
                 tempPipes.push(sprite);
                 if (tempPipes.length === 2) {
-                    this.placePipe(
-                        ...(tempPipes as [
-                            Phaser.Physics.Arcade.Sprite,
-                            Phaser.Physics.Arcade.Sprite,
-                        ]),
-                    );
+                    this.placePipe(tempPipes[0], tempPipes[1]);
                 }
             }
         });
     }
 
-    debug(): void {
+    debug() {
         const graphics = this.add.graphics();
-
-        // 设置线条样式（宽度为 2 像素，颜色为白色，透明度为 1）
         graphics.lineStyle(2, 0xffffff, 1);
 
-        // 绘制视平线（水平线，贯穿画布宽度，位于画布高度的中间）
-        const horizonY = Number(this.sys.game.config.height) / 2; // 画布高度的中点
+        const horizonY = Number(this.sys.game.config.height) / 2;
         graphics.beginPath();
         graphics.moveTo(0, horizonY);
         graphics.lineTo(Number(this.sys.game.config.width), horizonY);
         graphics.strokePath();
 
-        // 绘制视垂线（垂直线，贯穿画布高度，位于画布宽度的中间）
-        const verticalX = Number(this.sys.game.config.width) / 2; // 画布宽度的中点
+        const verticalX = Number(this.sys.game.config.width) / 2;
         graphics.beginPath();
         graphics.moveTo(verticalX, 0);
         graphics.lineTo(verticalX, Number(this.sys.game.config.height));

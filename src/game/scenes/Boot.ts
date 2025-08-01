@@ -12,6 +12,11 @@ export class Boot extends Phaser.Scene {
             frameHeight: 24,
         });
 
+        this.load.spritesheet("ground", "assets/ground-sprite.png", {
+            frameWidth: 336,
+            frameHeight: 112,
+        });
+
         this.load.image("background", "assets/bg.png");
         this.load.image("pipe", "assets/pipe.png");
     }
@@ -23,7 +28,7 @@ export class Boot extends Phaser.Scene {
                 start: 0,
                 end: 2, // 取决于你 spritesheet 有几帧
             }),
-            frameRate: 10, // 每秒播放帧数
+            frameRate: 6, // 每秒播放帧数
             repeat: -1, // 无限循环
         });
 
