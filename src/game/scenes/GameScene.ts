@@ -14,8 +14,12 @@ function mapVelocityToAngle(
 }
 
 export class GameScene extends Phaser.Scene {
-    private GAME_WIDTH!: number;
-    private GAME_HEIGHT!: number;
+    public GAME_WIDTH!: number;
+    public GAME_HEIGHT!: number;
+    private score: number = 0;
+    // private scoreText!: Phaser.GameObjects.Image;
+    private scoredPipes: Set<Phaser.Physics.Arcade.Sprite> = new Set();
+    private scoreContainer: Phaser.GameObjects.Container;
     camera!: Phaser.Cameras.Scene2D.Camera;
     background!: Phaser.GameObjects.Image;
     gameText!: Phaser.GameObjects.Text;
@@ -96,6 +100,14 @@ export class GameScene extends Phaser.Scene {
             pipe.body!.immovable = true;
         });
 
+        this.scoreContainer = this.add.container(0,50);
+        let scoreText = this.add
+            .image(this.GAME_WIDTH / 2, 16, "number", 0)
+            .setScale(2)
+            .setDepth(1000);
+        this.scoreContainer.add(scoreText);
+
+        this.debug();
         EventBus.emit("current-scene-ready", this);
     }
 
@@ -103,6 +115,51 @@ export class GameScene extends Phaser.Scene {
         if (!this.gameover) {
             this.ground.tilePositionX += 2;
 
+            this.pipes.getChildren().forEach((pipe) => {
+                const p = pipe as Phaser.Physics.Arcade.Sprite;
+
+                if (
+                    !this.scoredPipes.has(p) &&
+                    p.texture.key === "pipe" &&
+                    p.flipY
+                ) {
+                    if (p.x < this.bird.x && this.bird.x < p.width + p.x) {
+                        this.score += 1;
+
+                        // 清除旧分数容器并重建
+                        this.scoreContainer.destroy();
+                        this.scoreContainer = this.add.container(0, 16);
+                        let digit = 0;
+                        let score = this.score;
+
+                        // 将数字拆分为字符数组
+                        for (
+                            let i = this.score;
+                            i > 0;
+                            i = Math.floor(i / 10)
+                        ) {
+                            digit += 1;
+                        }
+                        for (let i = digit - 1; i >= 0; i--) {
+                            const scoreImage = this.add
+                                .image(
+                                    this.GAME_WIDTH / 2 -
+                                        i * 48 +
+                                        (digit - 1) * 24 /* ((j - 1) * 24) */,
+                                    50,
+                                    "number",
+                                    Math.floor(score / 10 ** i),
+                                )
+                                .setScale(2)
+                                .setDepth(1000);
+                            this.scoreContainer.add(scoreImage);
+                            score = score % 10 ** i;
+                        }
+                        this.scoredPipes.clear();
+                        this.scoredPipes.add(p);
+                    }
+                }
+            });
             if (this.bird.y >= this.HORIZONTAL_HEIGHT - this.bird.height) {
                 this.gameoverAni();
             } else if (this.bird.y - this.bird.height * 2 <= 0) {
@@ -150,8 +207,19 @@ export class GameScene extends Phaser.Scene {
         bird.setVelocity(0);
         bird.setAcceleration(0);
 
+        this.scoredPipes.clear();
+
         this.pipes.clear(true, true);
         this.generatePipe();
+
+        this.score = 0;
+        this.scoreContainer.destroy();
+        this.scoreContainer = this.add.container(0, 16);
+        const scoreImage = this.add
+            .image(this.GAME_WIDTH / 2, 50, "number", this.score)
+            .setScale(2)
+            .setDepth(1000);
+        this.scoreContainer.add(scoreImage);
     }
 
     placePipe(

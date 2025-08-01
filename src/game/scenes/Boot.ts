@@ -17,6 +17,17 @@ export class Boot extends Phaser.Scene {
             frameHeight: 112,
         });
 
+        // this.load.atlas(
+        //     "number", // key 名
+        //     "assets/numbers.png", // 图片路径
+        //     "assets/number.json", // JSON 路径
+        // );
+
+        this.load.spritesheet('number', 'assets/numbers.png', {
+          frameWidth: 24,
+          frameHeight: 36
+        });
+
         this.load.image("background", "assets/bg.png");
         this.load.image("pipe", "assets/pipe.png");
     }
