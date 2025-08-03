@@ -1,8 +1,8 @@
 import { EventBus } from "../EventBus";
 
-export class Boot extends Phaser.Scene {
+export class BootScene extends Phaser.Scene {
     constructor() {
-        super("Boot");
+        super("BootScene");
     }
 
     preload() {
@@ -28,8 +28,10 @@ export class Boot extends Phaser.Scene {
           frameHeight: 36
         });
 
-        this.load.image("background", "assets/bg.png");
+        this.load.image("background", "assets/background-day.png");
+        this.load.image("title", "assets/message-initial.png")
         this.load.image("pipe", "assets/pipe.png");
+        this.load.image("logo", "assets/logo.png"); // 假设有一个 logo
     }
 
     create() {
@@ -44,6 +46,6 @@ export class Boot extends Phaser.Scene {
         });
 
         EventBus.emit("current-scene-ready", this);
-        this.scene.start("GameScene");
+        this.scene.start("TitleScene");
     }
 }

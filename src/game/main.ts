@@ -1,4 +1,5 @@
-import { Boot } from './scenes/Boot';
+import { BootScene } from './scenes/BootScene';
+import { TitleScene } from './scenes/TitleScene'
 import { GameScene } from './scenes/GameScene'
 import { AUTO, Game } from 'phaser';
 
@@ -24,13 +25,14 @@ const config: Phaser.Types.Core.GameConfig = {
     physics: {
         default: "arcade",
         arcade: {
-            debug: false
+            debug: true
         }
     },
     parent: 'game-container',
     backgroundColor: '#028af8',
     scene: [
-        Boot,
+        BootScene,
+        TitleScene,
         GameScene
     ]
 };
