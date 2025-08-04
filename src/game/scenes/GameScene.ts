@@ -2,22 +2,13 @@
 import { EventBus } from '../EventBus';
 import { BaseScene } from './BaseScene';
 
-function mapVelocityToAngle(
-  v: number,
-  minV: number,
-  maxV: number,
-  minAngle: number,
-  maxAngle: number,
-): number {
-  const norm = ((Phaser.Math.Clamp(v, minV, maxV) - minV) / (maxV - minV)) ** 2;
-  return minAngle + norm * (maxAngle - minAngle);
-}
-
 export class GameScene extends BaseScene {
   private score = 0;
   private scoredPipes = new Set<Phaser.Physics.Arcade.Sprite>();
   private posList: number[][] = [];
   private scoreContainer!: Phaser.GameObjects.Container;
+  private graphics: Phaser.GameObjects.Graphics | null = null;
+  public playover: boolean;
 
   constructor() {
     super('GameScene');
@@ -34,6 +25,21 @@ export class GameScene extends BaseScene {
     this.setupInput();
     this.setupPipes();
     this.setupScoreDisplay();
+    this.events.on('update', () => {
+      // console.log(this.playover);
+      if (!this.graphics && this.playover) {
+        console.log(this.playover);
+        let obj = this.createDefaultMenu(
+          this,
+          this.GAME_WIDTH / 2,
+          this.GAME_HEIGHT / 2,
+          'TEST LABEL',
+          () => {},
+        );
+        this.graphics = obj.graphics;
+        fadeIn(this, this.graphics, 300);
+      }
+    });
     this.debug();
     EventBus.emit('current-scene-ready', this);
   }
@@ -46,8 +52,8 @@ export class GameScene extends BaseScene {
       this.recyclePipes();
       this.updateScore();
     }
-      this.checkBounds();
-      this.rotateBird();
+    this.checkBounds();
+    this.rotateBird();
   }
 
   private setupBackground() {
@@ -78,11 +84,11 @@ export class GameScene extends BaseScene {
 
   private setupInput() {
     this.input.on('pointerdown', () => {
-      this.bird.setVelocityY(250).setAccelerationY(-500);
+      this.bird.setVelocityY(250);
     });
     this.input.keyboard?.on('keydown-SPACE', () => {
-      if (this.gameover) this.restartGame();
-      else this.bird.setVelocityY(-400);
+      if (this.gameover && this.playover) this.restartGame();
+      else if (!this.gameover) this.bird.setVelocityY(-400);
     });
     this.overlapRef = this.physics.add.overlap(this.bird, this.pipes, () => this.gameoverAni());
   }
@@ -118,6 +124,8 @@ export class GameScene extends BaseScene {
     if (this.bird.y >= limitY - this.bird.height || this.bird.y <= 0) {
       if (!this.gameover) {
         this.gameoverAni();
+      } else {
+        this.handleGameOverFall();
       }
       this.bird.setDrag(400);
     }
@@ -183,21 +191,27 @@ export class GameScene extends BaseScene {
     this.gameover = false;
     this.pipes.clear(true, true);
     this.setupPipes();
-    this.bird.setGravityY(980).setVelocity(0).setAcceleration(0);
+    this.bird.setGravityY(980).setVelocity(0).setAcceleration(0).setDrag(0);
     const { GAME_WIDTH, GAME_HEIGHT } = this;
     this.bird.setPosition(GAME_WIDTH / 2 - 400, GAME_HEIGHT / 2 - 100);
     this.bird.anims.play('fly');
+    this.graphics!.destroy();
+    this.events.once('update', () => {
+      this.graphics = null; // 防止再使用
+    });
     this.scoredPipes.clear();
     this.score = 0;
+    this.playover = false;
     this.renderScore();
   }
 
   private handleGameOverFall() {
-    if (this.bird.y >= this.HORIZONTAL_HEIGHT - this.bird.height / 2) {
+    if (this.bird.y >= this.HORIZONTAL_HEIGHT + this.bird.height / 2) {
       this.bird
         .setVelocityY(0)
         .setGravityY(0)
         .setY(this.HORIZONTAL_HEIGHT - this.bird.height / 2);
+      this.playover = true;
     }
   }
 
@@ -224,7 +238,7 @@ export class GameScene extends BaseScene {
       this.bird.anims.pause();
       this.pipes.setVelocityX(0);
       this.bird.setGravityY(2080);
-      this.bird.setDepth(1000);
+      this.bird.setDepth(900);
     });
   }
 
@@ -248,4 +262,42 @@ export class GameScene extends BaseScene {
 
     this.pipes.setVelocityX(-200);
   }
+}
+
+export function fadeIn(scene: GameScene, obj: Phaser.GameObjects.Graphics, duration = 500) {
+  obj.setAlpha(0);
+    scene.tweens.add({
+      targets: obj,
+      alpha: 1,
+      duration,
+      ease: 'Linear',
+    });
+}
+
+export function fadeOut(
+  scene: Phaser.Scene,
+  obj: Phaser.GameObjects.GameObject,
+  duration = 500,
+  onComplete?: () => void,
+) {
+  scene.tweens.add({
+    targets: obj,
+    alpha: 0,
+    duration,
+    ease: 'Linear',
+    onComplete: () => {
+      if (onComplete) onComplete();
+    },
+  });
+}
+
+function mapVelocityToAngle(
+  v: number,
+  minV: number,
+  maxV: number,
+  minAngle: number,
+  maxAngle: number,
+): number {
+  const norm = ((Phaser.Math.Clamp(v, minV, maxV) - minV) / (maxV - minV)) ** 2;
+  return minAngle + norm * (maxAngle - minAngle);
 }
