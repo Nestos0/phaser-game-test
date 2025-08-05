@@ -49,7 +49,8 @@ export class BaseScene extends Phaser.Scene {
     const graphics = scene.add.graphics();
     graphics.fillStyle(fillColor, 1);
     graphics.fillRoundedRect(x - width / 2, y - height / 2, width, height, radius);
-    graphics.setDepth(999);
+
+    const container = scene.add.container(0, 0).setDepth(1000);
 
     // 创建交互区域
     const zone = scene.add
@@ -57,23 +58,24 @@ export class BaseScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
+    const list = [];
+
     // 创建文本
-    // const text = scene.add
-    //   .text(x, y, labelText, {
-    //     fontSize,
-    //     color: textColor,
-    //     fontFamily: 'sans-serif',
-    //   })
-    //   .setOrigin(0.5)
-    //   .setDepth(1001);
+    const text = scene.add
+      .text(x, y - height / 2, labelText, {
+        fontSize,
+        color: textColor,
+        fontFamily: 'sans-serif',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(10);
+    container.add(graphics);
+    container.add(text);
 
-    // 设置初始透明度
-    graphics.setAlpha(0);
+    // container.setAlpha(1);
 
-    // 添加点击事件
     zone.on('pointerdown', onClick);
 
-    // 返回所有对象以便管理
-    return { graphics, zone };
+    return { graphics, zone, container };
   }
 }

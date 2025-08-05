@@ -17,7 +17,7 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
         width: width,
-        height: height, 
+        height: height,
       },
     input: {
             keyboard: true // ✅ Explicitly enable keyboard input
@@ -25,7 +25,7 @@ const config: Phaser.Types.Core.GameConfig = {
     physics: {
         default: "arcade",
         arcade: {
-            debug: true
+            debug: false
         }
     },
     parent: 'game-container',

@@ -7,7 +7,7 @@ export class GameScene extends BaseScene {
   private scoredPipes = new Set<Phaser.Physics.Arcade.Sprite>();
   private posList: number[][] = [];
   private scoreContainer!: Phaser.GameObjects.Container;
-  private graphics: Phaser.GameObjects.Graphics | null = null;
+  private graphics: Phaser.GameObjects.Container | null = null;
   public playover: boolean;
 
   constructor() {
@@ -36,7 +36,7 @@ export class GameScene extends BaseScene {
           'TEST LABEL',
           () => {},
         );
-        this.graphics = obj.graphics;
+        this.graphics = obj.container;
         fadeIn(this, this.graphics, 300);
       }
     });
@@ -264,8 +264,8 @@ export class GameScene extends BaseScene {
   }
 }
 
-export function fadeIn(scene: GameScene, obj: Phaser.GameObjects.Graphics, duration = 500) {
-  obj.setAlpha(0);
+export function fadeIn(scene: GameScene, obj: Phaser.GameObjects.Container, duration = 500) {
+    obj.setAlpha(0);
     scene.tweens.add({
       targets: obj,
       alpha: 1,
